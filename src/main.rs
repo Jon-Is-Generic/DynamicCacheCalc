@@ -1,57 +1,58 @@
+use std::cell::{RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
+use rand::prelude::ThreadRng;
+use rand::Rng;
 
 struct Access {
     eviction_time : usize,
     hit : bool,
 }
 
-fn init_cache() -> Simulator {
-    todo!()
-}
-
-
-fn oracle(i : i32) -> usize {
-    todo!()
-}
-
 struct Sampler {
-
+    r : RefCell<ThreadRng>,
 }
 
 impl Sampler {
+
     fn new<T : Iterator<Item=(u64, f64)>>(t : T) -> Sampler {
-        todo!()
+        let mut r = rand::thread_rng();
+        Sampler { r : RefCell::new(r) }
     }
 
     fn sample(&self) -> u64 {
-        todo!()
+        self.r.borrow_mut().gen_range(1..=100)
     }
 }
 
 struct Simulator {
-    cur : u64,
+    size: u64,
     tracker : HashMap<u64, u64>,
     step : u64,
 }
 
 impl Simulator {
     fn init() -> Simulator {
-        Simulator {cur : 0, tracker : HashMap::new(), step : 0}
+        Simulator { size: 0, tracker : HashMap::new(), step : 0}
     }
 
     fn add_tenancy(&mut self, tenancy : u64) {
-        todo!()
+        self.update();
+        self.size += 1;
+        let target = tenancy + self.step;
+        let leases_at_step = self.tracker.get(&target).copied().unwrap_or(0);
+        self.tracker.insert(target, leases_at_step +1);
     }
 
     fn update(&mut self) {
-        todo!()
+        self.step += 1;
+        self.size -= self.tracker.remove(&self.step).unwrap_or(0);
     }
 
     fn get_excess(&self, fixed : u64) -> u64 {
-        if self.cur <= fixed {
+        if self.size <= fixed {
             0
         } else {
-            fixed - self.cur
+            self.size - fixed
         }
     }
 }
@@ -75,12 +76,13 @@ fn caching(ten_dist : Sampler, cache_size : u64, delta : f64) -> (u64, u64) {
         prev_output = Some((total_overalloc as f64) / (trace_len as f64));
         samples_to_issue *= 2;
     }
-
-    todo!()
 }
 
 
 
 fn main() {
-    println!("Hello, world!");
+
+    let (over_alloc, trace_len) = caching(Sampler::new(None.into_iter()), 10, 0.05);
+
+    println!("over_alloc: {}, trace_len: {}, div : {}", over_alloc, trace_len, over_alloc/trace_len);
 }

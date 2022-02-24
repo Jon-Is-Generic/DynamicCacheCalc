@@ -1,26 +1,29 @@
-use std::cell::{RefCell, RefMut};
-use std::collections::{HashMap, HashSet};
+use std::cell::{RefCell};
+use std::collections::{HashMap};
+use std::ops::DerefMut;
+use rand::distributions::WeightedIndex;
+use rand::distributions::Distribution;
 use rand::prelude::ThreadRng;
-use rand::Rng;
-
-struct Access {
-    eviction_time : usize,
-    hit : bool,
-}
 
 struct Sampler {
-    r : RefCell<ThreadRng>,
+    random: RefCell<ThreadRng>,
+    distribution: WeightedIndex<f64>,
+    source : Vec<u64>
 }
 
 impl Sampler {
 
     fn new<T : Iterator<Item=(u64, f64)>>(t : T) -> Sampler {
-        let mut r = rand::thread_rng();
-        Sampler { r : RefCell::new(r) }
+        let r = RefCell::new(rand::thread_rng());
+        let vector : Vec<(u64, f64)> = t.into_iter().collect();//Guarantees our index ordering.
+        let distribution = WeightedIndex::new(vector.iter().map(|(_, weight)| *weight)).unwrap();
+        let source = vector.into_iter().map(|(item, _)| item).collect();
+        Sampler { random: r, distribution, source }
     }
 
     fn sample(&self) -> u64 {
-        self.r.borrow_mut().gen_range(1..=100)
+        let index = self.distribution.sample(self.random.borrow_mut().deref_mut());
+        self.source[index]
     }
 }
 
@@ -55,6 +58,10 @@ impl Simulator {
             self.size - fixed
         }
     }
+
+    fn _get_size(&self) -> u64 {
+        self.size
+    }
 }
 
 fn caching(ten_dist : Sampler, cache_size : u64, delta : f64) -> (u64, u64) {
@@ -64,7 +71,7 @@ fn caching(ten_dist : Sampler, cache_size : u64, delta : f64) -> (u64, u64) {
     let mut prev_output : Option<f64> = None;
     let mut total_overalloc : u64 = 0;
     loop {
-        for i in 0..samples_to_issue {
+        for _ in 0..samples_to_issue {
             trace_len += 1;
             let tenancy = ten_dist.sample();
             cache.add_tenancy(tenancy);
